@@ -1,0 +1,2 @@
+C:\Users\Harsh Malik\source\repos\servertest\Debug\servertest.exe
+C:\Users\Harsh Malik\Desktop\Project\servertest\Debug\servertest.exe
