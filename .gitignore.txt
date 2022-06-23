@@ -1,2 +1,4 @@
 Clienttest/Debug
 Servertest/Debug
+
+Servertest
