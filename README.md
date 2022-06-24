@@ -53,7 +53,7 @@ Signal :The signal operation increments the value of its argument S.
 
   # TO USE IT 
   
-  1. build a file clienttest.cpp in visual studio . 
+  1. build a file client.cpp in visual studio . 
   2. build a file server.cpp
   3. Run a server by running server.exe
   4. then start clients.exe file using (client.exe "127.0.0.1" ) 127.0.0.1 is a local server for machine 
