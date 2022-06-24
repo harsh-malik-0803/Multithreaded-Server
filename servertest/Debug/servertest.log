@@ -1,3 +1,0 @@
-﻿  server.cpp
-C:\Users\Harsh Malik\Desktop\Project\servertest\server.cpp(130,13): warning C4101: 'iSendResult': unreferenced local variable
-  servertest.vcxproj -> C:\Users\Harsh Malik\Desktop\Project\servertest\Debug\servertest.exe
