@@ -1,171 +1,160 @@
 #define WIN32_LEAN_AND_MEAN
-#include<stdio.h>
+#include <iostream>
+#include <string>
+#include <thread>
+#include <atomic>
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include<iostream>
-#include<string>
-#include<thread>
 
 // Need to link with Ws2_32.lib, Mswsock.lib, and Advapi32.lib
 #pragma comment (lib, "Ws2_32.lib")
 #pragma comment (lib, "Mswsock.lib")
 #pragma comment (lib, "AdvApi32.lib")
 
-
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "27015"
 
 using namespace std;
 
+atomic<bool> serverRunning(true);
 
-void fun1(bool* server_running , SOCKET ConnectSocket) {
-    string sendbuf;
-    while (*server_running) {
-        getline(cin, sendbuf);
-        sendbuf = sendbuf + "\r";
-        int iResult = send(ConnectSocket , sendbuf.c_str(), sendbuf.length() + 1, 0);
-        if (iResult == SOCKET_ERROR) {
-            printf("send failed with error: %d\n", WSAGetLastError());
-            closesocket(ConnectSocket);
+// Function to send messages to the server
+void sender(SOCKET connectSocket) {
+    string sendBuffer;
+    while (serverRunning) {
+        getline(cin, sendBuffer);
+        sendBuffer += "\r";
+        int sendResult = send(connectSocket, sendBuffer.c_str(), sendBuffer.length()+1, 0);
+        if (sendResult == SOCKET_ERROR) {
+            cerr << "send failed with error: " << WSAGetLastError() << "\n";
+            closesocket(connectSocket);
             WSACleanup();
-            *server_running = false;
+            serverRunning = false;
             break;
         }
     }
 }
 
-void fun2(bool* server_running , SOCKET ConnectSocket) {
-    int recvbuflen = DEFAULT_BUFLEN;
-    char recvbuf[DEFAULT_BUFLEN];
+// Function to receive messages from the server
+void receiver(SOCKET connectSocket) {
+    int recvBufferSize = DEFAULT_BUFLEN;
+    char recvBuffer[DEFAULT_BUFLEN];
 
-    int iResult = 1;
-    // Receive until the peer closes the connection
-    while (iResult > 0 && *server_running ) {
-
-        iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
-        if (iResult > 0) {
-            string message = (string)recvbuf;
-            cout << message << endl;
+    while (serverRunning) {
+        int recvResult = recv(connectSocket, recvBuffer, recvBufferSize, 0);
+        if (recvResult > 0) {
+            string message = recvBuffer ;
+            cout << message << "\n";
         }
         else {
-            if (iResult == 0) {
+            if (recvResult == 0) {
                 cout << "Connection closed\n";
             }
             else {
-                cout << "recv failed with error : " << WSAGetLastError() << endl;
+                cerr << "recv failed with error: " << WSAGetLastError() << "\n";
             }
-            *server_running = false;
+            serverRunning = false;
             return;
         }
     }
 }
 
-class client{
-    public:
-    bool server_running ;
-    SOCKET ConnectSocket ;
-    string name ;
-    client(){
-        ConnectSocket  = INVALID_SOCKET;
-        server_running = true;
-        cout<<"Enter your name : ";
-        cin>>name;
-    }
-    bool on_startup() {
-        WSADATA wsaData;
-        struct addrinfo* result = NULL,
-            * ptr = NULL,
-            hints;
+// Client class to encapsulate client-related functionality
+class Client {
+public:
+    SOCKET connectSocket;
+    string name;
 
-        int iResult;
-
-        // Initialize Winsock
-        iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-        if (iResult != 0) {
-            printf("WSAStartup failed with error: %d\n", iResult);
-            return 1;
+    Client(const string& serverIP) : connectSocket(INVALID_SOCKET) {
+        cout << "Enter your name: ";
+        cin >> name;
+        if (!onStartup(serverIP)) {
+            cerr << "Error in starting up the client.\n";
+            exit(1);
         }
+    }
+
+    // Initialize Winsock, create socket, and connect to the server
+    bool onStartup(const string& serverIP) {
+        WSADATA wsaData;
+        int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+        if (result != 0) {
+            cerr << "WSAStartup failed with error: " << result << "\n";
+            return false;
+        }
+
+        struct addrinfo* resultAddr = NULL;
+        struct addrinfo hints;
+
         ZeroMemory(&hints, sizeof(hints));
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_protocol = IPPROTO_TCP;
 
-        // Resolve the server address and port
-        iResult = getaddrinfo("127.0.0.1", DEFAULT_PORT, &hints, &result);
-        if (iResult != 0) {
-            printf("getaddrinfo failed with error: %d\n", iResult);
+        result = getaddrinfo(serverIP.c_str(), DEFAULT_PORT, &hints, &resultAddr);
+        if (result != 0) {
+            cerr << "getaddrinfo failed with error: " << result << "\n";
             WSACleanup();
-            return 1;
+            return false;
         }
 
-        // Attempt to connect to an address until one succeeds
-        for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
-
-            // Create a SOCKET for connecting to server
-            ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-
-            if (ConnectSocket == INVALID_SOCKET) {
-                printf("socket failed with error: %ld\n", WSAGetLastError());
+        for (struct addrinfo* ptr = resultAddr; ptr != NULL; ptr = ptr->ai_next) {
+            connectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+            if (connectSocket == INVALID_SOCKET) {
+                cerr << "socket failed with error: " << WSAGetLastError() << "\n";
                 WSACleanup();
-                return 1;
+                return false;
             }
 
-            // Connect to server.
-            iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
-            if (iResult == SOCKET_ERROR) {
-                closesocket(ConnectSocket);
-                ConnectSocket = INVALID_SOCKET;
+            result = connect(connectSocket, ptr->ai_addr, static_cast<int>(ptr->ai_addrlen));
+            if (result == SOCKET_ERROR) {
+                closesocket(connectSocket);
+                connectSocket = INVALID_SOCKET;
                 continue;
             }
             break;
         }
 
-        freeaddrinfo(result);
+        freeaddrinfo(resultAddr);
 
-        if (ConnectSocket == INVALID_SOCKET) {
-            printf("Unable to connect to server!\n");
+        if (connectSocket == INVALID_SOCKET) {
+            cerr << "Unable to connect to the server.\n";
             WSACleanup();
-            return 1;
+            return false;
         }
         else {
-            cout << "Connected to server " << endl;
+            cout << "Connected to the server.\n";
         }
-        return 0;
+
+        return true;
     }
-    ~client(){
-        
-        server_running = false;
-        // shutdown the send half of the connection since no more data will be sent
-        int iResult = shutdown(ConnectSocket , SD_SEND);
-        // cleanup
-        closesocket(ConnectSocket );
+
+    // Destructor to close the socket and clean up
+    ~Client() {
+        serverRunning = false;
+        shutdown(connectSocket, SD_SEND);
+        closesocket(connectSocket);
         WSACleanup();
-        
     }
 };
 
-int __cdecl main(int argc, char** argv)
-{   
-
-    // creating a client 
-    client * c1 = new client();
-    if (c1->on_startup()) return 0;
-   
-
-    std::thread th1(fun1 , &(c1->server_running) , c1->ConnectSocket );
-    std::thread th2(fun2 , &(c1->server_running) , c1->ConnectSocket );
-
-    if (th1.joinable() || th2.joinable()) {
-        th1.join();
-        th2.join();
-        cout << "server Closed " << endl;
+int main(int argc, char** argv) {
+    if (argc != 2) {
+        cerr << "Usage: " << argv[0] << " <server IP>\n";
+        return 1;
     }
 
-    delete c1;
+    Client* client = new Client(argv[1]);
 
+    // Start sender and receiver threads
+    thread senderThread(sender, client->connectSocket);
+    thread receiverThread(receiver, client->connectSocket);
+
+    // Wait for threads to finish
+    if (senderThread.joinable()) senderThread.join();
+    if (receiverThread.joinable()) receiverThread.join();
+
+    delete client;
     return 0;
 }
-
