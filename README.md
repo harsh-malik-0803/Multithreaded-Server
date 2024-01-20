@@ -42,13 +42,6 @@ extend the functionality of the previous tool so it supports multiple chat rooms
 should be able to manage multiple users in multiple chat rooms at a given time.
 
 
-# Semaphores
-Semaphores are integer variables that are used to solve the critical section problem by using two atomic operations, wait and signal that are used for process synchronization. The definitions of wait and signal are as follows −
-Wait: The wait operation decrements the value of its argument S, if it is positive
-Signal :The signal operation increments the value of its argument S.
-
-
-
 
 
   # TO USE IT 
