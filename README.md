@@ -13,7 +13,7 @@ who wants to learn and implement socket programming as well as for anyone who wa
 3. implementing a simple client-server chat tool in c++ .
 4. then use multithreading to make it bidirectional c++ .
 5. handling multiple chat rooms functionality into the chat tool.
-6. using semaphores , mutex to remove critical state.
+6. using mutex to remove critical state.
 
 
 # Socket Programming
